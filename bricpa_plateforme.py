@@ -164,13 +164,16 @@ def show_client_interface():
     </div>
     """, unsafe_allow_html=True)
     
-    tab1, tab2 = st.tabs(["📝 Nouvelle demande", "📊 Mes demandes"])
+    tab1, tab2, tab3 = st.tabs(["📝 Nouvelle demande", "📊 Mes demandes", "💬 Assistant IA"])
     
     with tab1:
         show_new_demande_form()
     
     with tab2:
         show_client_demandes()
+    
+    with tab3:
+        show_chat_assistant()
 
 def show_new_demande_form():
     st.subheader("📝 Publier une demande de travaux")
@@ -546,6 +549,54 @@ def show_devis_form(demande):
 def get_artisan_by_id(artisan_id):
     artisans = load_json(ARTISANS_FILE, default=[])
     return next((a for a in artisans if a['id'] == artisan_id), None)
+
+# ==================== CHAT ASSISTANT IA ====================
+def show_chat_assistant():
+    st.subheader("💬 Assistant IA - Posez vos questions sur vos travaux")
+    st.info("🤖 Je peux vous conseiller sur les types de travaux, les prix moyens, les matériaux, etc.")
+    
+    # Initialiser l'historique du chat
+    if 'chat_messages' not in st.session_state:
+        st.session_state.chat_messages = []
+    
+    # Afficher l'historique
+    for message in st.session_state.chat_messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+    
+    # Zone de saisie
+    if prompt := st.chat_input("Posez votre question (ex: Quel est le prix moyen pour repeindre une pièce ?)"):
+        # Ajouter le message utilisateur
+        st.session_state.chat_messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        
+        # Générer la réponse
+        with st.chat_message("assistant"):
+            with st.spinner("Réflexion en cours..."):
+                try:
+                    # Contexte pour l'assistant
+                    context = """Tu es un assistant expert en travaux et rénovation.
+Tu aides les clients à comprendre leurs besoins, estimer les coûts, choisir les matériaux.
+Donne des réponses claires, précises et avec des fourchettes de prix réalistes.
+Sois concis (max 200 mots) et pratique."""
+                    
+                    full_prompt = f"{context}\n\nQuestion: {prompt}"
+                    response = model.generate_content(full_prompt)
+                    answer = response.text
+                    
+                    st.markdown(answer)
+                    st.session_state.chat_messages.append({"role": "assistant", "content": answer})
+                    
+                except Exception as e:
+                    error_msg = f"Erreur: {str(e)}"
+                    st.error(error_msg)
+                    st.session_state.chat_messages.append({"role": "assistant", "content": error_msg})
+    
+    # Bouton pour réinitialiser
+    if st.button("🔄 Nouvelle conversation"):
+        st.session_state.chat_messages = []
+        st.rerun()
 
 # ==================== MAIN ====================
 def main():
